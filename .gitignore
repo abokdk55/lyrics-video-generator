@@ -1,0 +1,11 @@
+node_modules/
+uploads/
+output/
+*.mp4
+*.mp3
+*.lrc
+*.srt
+*.jpeg
+*.jpg
+*.png
+.DS_Store

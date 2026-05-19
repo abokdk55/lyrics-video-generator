@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>리릭스 비디오 생성기</title>
+<style>
+:root {
+  --bg: #0c0a16;
+  --bg2: #100d1b;
+  --gold: #c9a96e;
+  --gold2: rgba(201,169,110,0.5);
+  --gold3: rgba(201,169,110,0.15);
+  --gold4: rgba(201,169,110,0.07);
+  --text: #f5e8d0;
+  --text2: rgba(245,232,208,0.5);
+  --text3: rgba(245,232,208,0.25);
+  --card: rgba(255,255,255,0.03);
+  --card2: rgba(255,255,255,0.05);
+  --border: rgba(201,169,110,0.18);
+  --border2: rgba(201,169,110,0.45);
+  --radius: 12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:-apple-system,'Apple SD Gothic Neo',system-ui,sans-serif;
+  min-height:100vh;
+  padding:0 0 80px;
+}
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(ellipse at 15% 50%,rgba(168,118,52,0.10) 0%,transparent 55%),
+    radial-gradient(ellipse at 85% 50%,rgba(80,60,160,0.06) 0%,transparent 55%),
+    radial-gradient(ellipse at 50% 100%,rgba(0,0,0,0.4) 0%,transparent 60%);
+}
+.wrap{position:relative;z-index:1;max-width:900px;margin:0 auto;padding:0 24px}
+
+/* ── Header ─────────────────────────────── */
+header{text-align:center;padding:64px 0 52px}
+.hline{width:100px;height:1px;background:linear-gradient(90deg,transparent,var(--gold2),transparent);margin:0 auto 28px}
+header h1{font-size:22px;font-weight:300;letter-spacing:.22em;color:var(--gold);margin-bottom:8px}
+header p{font-size:13px;color:var(--text2);letter-spacing:.05em}
+
+/* ── Section ─────────────────────────────── */
+.section{margin-bottom:40px}
+.sec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.sec-title{font-size:12px;letter-spacing:.18em;color:var(--gold2);text-transform:uppercase}
+.opt-badge{font-size:10px;color:var(--text3);letter-spacing:.05em;border:1px solid var(--border);border-radius:20px;padding:2px 8px;margin-left:8px}
+
+/* ── Song Card ─────────────────────────────── */
+.song-card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--radius);padding:20px;margin-bottom:12px;
+  transition:border-color .3s;
+}
+.song-card:hover{border-color:rgba(201,169,110,0.28)}
+.card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.card-num{font-size:11px;color:var(--gold);letter-spacing:.15em}
+.del-btn{background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;line-height:1;padding:2px 6px;border-radius:4px;transition:color .2s}
+.del-btn:hover{color:rgba(220,100,100,.7)}
+
+/* Upload grid per song */
+.upload-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+.drop{
+  border:1px dashed var(--border);border-radius:10px;
+  padding:18px 10px;text-align:center;cursor:pointer;
+  transition:all .25s;background:var(--card);position:relative;overflow:hidden;
+  min-height:110px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+}
+.drop:hover,.drop.over{border-color:var(--border2);background:rgba(201,169,110,0.06)}
+.drop.filled{border-color:rgba(201,169,110,0.35);background:rgba(201,169,110,0.04)}
+.drop input[type=file]{display:none}
+.drop .d-icon{font-size:24px;margin-bottom:8px;opacity:.55;line-height:1}
+.drop .d-label{font-size:11px;color:var(--gold);letter-spacing:.08em;margin-bottom:3px}
+.drop .d-hint{font-size:10px;color:var(--text3)}
+.drop .d-file{font-size:10px;color:var(--gold);margin-top:6px;word-break:break-all;line-height:1.3;display:none}
+.drop.filled .d-file{display:block}
+.drop .album-prev{width:52px;height:52px;object-fit:cover;border-radius:4px;margin-bottom:6px;display:none}
+.drop.filled.has-prev .album-prev{display:block}
+.drop.filled.has-prev .d-icon{display:none}
+
+.song-title-row{display:flex;align-items:center;gap:10px}
+.song-title-row label{font-size:11px;color:var(--text2);white-space:nowrap;letter-spacing:.05em;min-width:44px}
+.song-title-row input{
+  flex:1;background:rgba(255,255,255,0.04);border:1px solid var(--border);
+  border-radius:7px;color:var(--text);font-size:13px;padding:8px 12px;
+  outline:none;font-family:inherit;transition:border-color .25s;
+}
+.song-title-row input:focus{border-color:var(--border2)}
+.song-title-row input::placeholder{color:var(--text3)}
+
+/* ── BG Multi Upload ─────────────────────────────── */
+.bg-multi-drop{
+  border:1px dashed var(--border);border-radius:10px;
+  padding:32px 20px;text-align:center;cursor:pointer;
+  transition:all .25s;background:var(--card);margin-bottom:14px;
+}
+.bg-multi-drop:hover,.bg-multi-drop.over{border-color:var(--border2);background:rgba(201,169,110,0.06)}
+.bg-multi-drop input{display:none}
+.bg-multi-drop .d-icon{font-size:30px;margin-bottom:10px;opacity:.5;line-height:1}
+.bg-multi-drop .d-label{font-size:13px;color:var(--gold2);letter-spacing:.06em;margin-bottom:5px}
+.bg-multi-drop .d-hint{font-size:11px;color:var(--text3)}
+
+.bg-list{display:flex;flex-direction:column;gap:8px}
+.bg-item{
+  display:flex;align-items:center;gap:12px;
+  background:var(--card);border:1px solid var(--border);
+  border-radius:8px;padding:8px 14px;
+  transition:border-color .2s;
+}
+.bg-item:hover{border-color:rgba(201,169,110,0.28)}
+.bg-num{font-size:11px;color:var(--gold);min-width:22px;text-align:center;letter-spacing:.05em}
+.bg-thumb{width:72px;height:46px;object-fit:cover;border-radius:4px;flex-shrink:0}
+.bg-name{flex:1;font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bg-sort-btns{display:flex;flex-direction:column;gap:3px}
+.bg-sort-btn{
+  background:none;border:1px solid var(--border);color:var(--text3);
+  border-radius:4px;width:26px;height:20px;cursor:pointer;
+  font-size:9px;line-height:1;display:flex;align-items:center;justify-content:center;
+  transition:all .2s;
+}
+.bg-sort-btn:hover:not(:disabled){border-color:var(--border2);color:var(--gold)}
+.bg-sort-btn:disabled{opacity:.2;cursor:default}
+.bg-del{
+  background:none;border:none;color:var(--text3);cursor:pointer;
+  font-size:16px;padding:2px 6px;border-radius:4px;transition:color .2s;flex-shrink:0;
+}
+.bg-del:hover{color:rgba(220,100,100,.7)}
+.bg-count-badge{font-size:11px;color:var(--text3);margin-top:10px;text-align:center;letter-spacing:.04em}
+
+/* ── Add buttons ─────────────────────────────── */
+.add-btn{
+  width:100%;padding:12px;background:none;border:1px dashed var(--border);
+  border-radius:10px;color:var(--text2);font-size:13px;letter-spacing:.08em;
+  cursor:pointer;transition:all .25s;font-family:inherit;
+}
+.add-btn:hover{border-color:var(--border2);color:var(--gold);background:var(--gold4)}
+
+/* ── Settings row ─────────────────────────────── */
+.settings-row{display:flex;align-items:center;gap:12px;margin-bottom:28px}
+.settings-row label{font-size:12px;color:var(--gold2);letter-spacing:.1em;white-space:nowrap}
+.settings-row input{
+  flex:1;max-width:240px;background:var(--card2);border:1px solid var(--border);
+  border-radius:8px;color:var(--text);font-size:13px;padding:10px 14px;
+  outline:none;font-family:inherit;transition:border-color .25s;
+}
+.settings-row input:focus{border-color:var(--border2)}
+
+/* ── Generate button ─────────────────────────────── */
+.gen-btn{
+  width:100%;padding:17px;
+  background:linear-gradient(135deg,rgba(201,169,110,0.14),rgba(201,169,110,0.07));
+  border:1px solid rgba(201,169,110,0.38);border-radius:11px;
+  color:var(--gold);font-size:14px;font-weight:400;letter-spacing:.2em;
+  cursor:pointer;transition:all .3s;font-family:inherit;
+}
+.gen-btn:hover:not(:disabled){
+  background:linear-gradient(135deg,rgba(201,169,110,0.24),rgba(201,169,110,0.12));
+  border-color:rgba(201,169,110,0.65);
+}
+.gen-btn:disabled{opacity:.35;cursor:not-allowed}
+
+/* ── Status ─────────────────────────────── */
+.status-area{margin-top:36px;display:none}
+.status-msg{font-size:13px;color:var(--text2);text-align:center;min-height:20px;margin-bottom:14px}
+.status-msg.err{color:rgba(220,100,100,.85)}
+.status-msg.ok{color:rgba(130,200,130,.9)}
+.pbar-wrap{background:rgba(255,255,255,0.06);border-radius:4px;height:3px;overflow:hidden;margin-bottom:10px}
+.pbar{height:100%;background:linear-gradient(90deg,rgba(201,169,110,.5),var(--gold));border-radius:4px;width:0%;transition:width .4s}
+.pdetail{text-align:center;font-size:11px;color:var(--text3);letter-spacing:.06em}
+
+/* ── Download ─────────────────────────────── */
+.dl-area{display:none;margin-top:32px;text-align:center}
+.dl-btn{
+  display:inline-block;padding:14px 48px;
+  background:linear-gradient(135deg,rgba(201,169,110,0.18),rgba(201,169,110,0.08));
+  border:1px solid rgba(201,169,110,0.55);border-radius:10px;
+  color:var(--gold);font-size:14px;letter-spacing:.12em;text-decoration:none;
+  transition:all .3s;
+}
+.dl-btn:hover{background:linear-gradient(135deg,rgba(201,169,110,0.28),rgba(201,169,110,0.14))}
+.dl-sub{font-size:11px;color:var(--text3);margin-top:10px;letter-spacing:.05em}
+
+footer{text-align:center;margin-top:64px;font-size:10px;color:rgba(201,169,110,.12);letter-spacing:.2em}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="hline"></div>
+    <h1>리릭스 비디오 생성기</h1>
+    <p>파일을 업로드하고 고품질 리릭스 비디오를 만들어보세요</p>
+    <div class="hline" style="margin-top:28px"></div>
+  </header>
+
+  <!-- Songs -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="sec-title">곡 목록</span>
+    </div>
+    <div id="songs-container"></div>
+    <button class="add-btn" id="add-song">＋ 곡 추가</button>
+  </div>
+
+  <!-- Backgrounds -->
+  <div class="section">
+    <div class="sec-head">
+      <span class="sec-title">배경 이미지 <span class="opt-badge">선택사항</span></span>
+    </div>
+    <div class="bg-multi-drop" id="bg-drop">
+      <input type="file" id="bg-input" accept="image/*" multiple>
+      <div class="d-icon">🌅</div>
+      <div class="d-label">이미지를 여러 장 선택하거나 드래그하세요</div>
+      <div class="d-hint">JPG · PNG · 여러 파일 동시 선택 가능 · 순서 조정 가능</div>
+    </div>
+    <div class="bg-list" id="bg-list"></div>
+    <div class="bg-count-badge" id="bg-count-badge" style="display:none"></div>
+  </div>
+
+  <!-- Settings -->
+  <div class="settings-row">
+    <label>아티스트</label>
+    <input type="text" id="creator" value="mintorain" placeholder="아티스트 / 제작자 이름">
+  </div>
+
+  <button class="gen-btn" id="gen-btn" disabled>비디오 생성하기</button>
+
+  <div class="status-area" id="status-area">
+    <div class="status-msg" id="status-msg"></div>
+    <div class="pbar-wrap"><div class="pbar" id="pbar"></div></div>
+    <div class="pdetail" id="pdetail"></div>
+  </div>
+
+  <div class="dl-area" id="dl-area">
+    <a class="dl-btn" id="dl-btn" href="#">⬇ 비디오 다운로드</a>
+    <div class="dl-sub">MP4 · H.264 · 1920×1080 · AAC</div>
+  </div>
+
+  <footer>LYRICS VIDEO GENERATOR</footer>
+</div>
+
+<script>
+const songs = [];
+let songCount = 0;
+let bgFiles = []; // File objects in display order
+
+// ── Song card ──────────────────────────────────
+function createSongCard(idx) {
+  const card = document.createElement('div');
+  card.className = 'song-card';
+  card.dataset.idx = idx;
+  card.innerHTML = `
+    <div class="card-head">
+      <span class="card-num">곡 ${idx + 1}</span>
+      ${songs.length > 0 ? `<button class="del-btn" title="삭제">✕</button>` : ''}
+    </div>
+    <div class="upload-row">
+      ${makeDropZone('album', idx, '🖼', '앨범 이미지', 'JPG · PNG', 'image/*', true)}
+      ${makeDropZone('lrc',   idx, '🎵', 'LRC 파일', '.lrc', '.lrc')}
+      ${makeDropZone('srt',   idx, '📄', 'SRT 파일', '.srt · 선택', '.srt')}
+      ${makeDropZone('audio', idx, '🎧', '음악 파일', 'MP3 · WAV · M4A', 'audio/*')}
+    </div>
+    <div class="song-title-row">
+      <label>곡 제목</label>
+      <input type="text" class="title-input" placeholder="노래 제목 (LRC에서 자동 감지)" autocomplete="off">
+    </div>`;
+
+  const delBtn = card.querySelector('.del-btn');
+  if (delBtn) delBtn.addEventListener('click', () => removeSongCard(card, idx));
+
+  ['album','lrc','srt','audio'].forEach(key => {
+    const zone = card.querySelector(`.drop[data-key="${key}"]`);
+    if (!zone) return;
+    const input = zone.querySelector('input');
+    zone.addEventListener('click', e => { if (!e.target.closest('input')) input.click(); });
+    input.addEventListener('change', () => { if (input.files[0]) setFile(zone, idx, key, input.files[0]); });
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('over'); });
+    zone.addEventListener('dragleave', e => { if (!zone.contains(e.relatedTarget)) zone.classList.remove('over'); });
+    zone.addEventListener('drop', e => {
+      e.preventDefault(); zone.classList.remove('over');
+      const f = e.dataTransfer.files[0]; if (f) setFile(zone, idx, key, f);
+    });
+  });
+
+  card.querySelector('.title-input').addEventListener('input', e => { songs[idx].title = e.target.value; });
+  return card;
+}
+
+function makeDropZone(key, idx, icon, label, hint, accept, isAlbum) {
+  return `
+    <div class="drop" data-key="${key}" data-idx="${idx}">
+      <input type="file" accept="${accept}">
+      ${isAlbum ? '<img class="album-prev" alt="">' : ''}
+      <div class="d-icon">${icon}</div>
+      <div class="d-label">${label}</div>
+      <div class="d-hint">${hint}</div>
+      <div class="d-file"></div>
+    </div>`;
+}
+
+function setFile(zone, idx, key, file) {
+  songs[idx][key] = file;
+  zone.classList.add('filled');
+  zone.querySelector('.d-file').textContent = file.name;
+  if (key === 'album') {
+    const prev = zone.querySelector('.album-prev');
+    prev.src = URL.createObjectURL(file);
+    zone.classList.add('has-prev');
+  }
+  checkReady();
+}
+
+function addSong() {
+  const idx = songCount++;
+  songs.push({ title: '', album: null, lrc: null, srt: null, audio: null });
+  document.getElementById('songs-container').appendChild(createSongCard(idx));
+  checkReady();
+}
+
+function removeSongCard(card, idx) {
+  const container = document.getElementById('songs-container');
+  if (container.children.length <= 1) return;
+  songs.splice(idx, 1);
+  card.remove();
+  Array.from(container.querySelectorAll('.song-card')).forEach((c, i) => {
+    c.dataset.idx = i;
+    c.querySelector('.card-num').textContent = `곡 ${i + 1}`;
+    ['album','lrc','srt','audio'].forEach(key => {
+      const zone = c.querySelector(`.drop[data-key="${key}"]`);
+      if (zone) zone.dataset.idx = i;
+    });
+  });
+  checkReady();
+}
+
+// ── BG multi upload ──────────────────────────────────
+const bgDrop  = document.getElementById('bg-drop');
+const bgInput = document.getElementById('bg-input');
+
+bgDrop.addEventListener('click', e => { if (!e.target.closest('input')) bgInput.click(); });
+bgDrop.addEventListener('dragover', e => { e.preventDefault(); bgDrop.classList.add('over'); });
+bgDrop.addEventListener('dragleave', e => { if (!bgDrop.contains(e.relatedTarget)) bgDrop.classList.remove('over'); });
+bgDrop.addEventListener('drop', e => {
+  e.preventDefault(); bgDrop.classList.remove('over');
+  addBgFiles(e.dataTransfer.files);
+});
+bgInput.addEventListener('change', () => { addBgFiles(bgInput.files); bgInput.value = ''; });
+
+function addBgFiles(fileList) {
+  for (const f of fileList) {
+    if (f.type.startsWith('image/')) bgFiles.push(f);
+  }
+  renderBgList();
+}
+
+function renderBgList() {
+  const list  = document.getElementById('bg-list');
+  const badge = document.getElementById('bg-count-badge');
+  list.innerHTML = '';
+
+  bgFiles.forEach((f, i) => {
+    const item = document.createElement('div');
+    item.className = 'bg-item';
+    item.innerHTML = `
+      <span class="bg-num">${i + 1}</span>
+      <img class="bg-thumb" src="${URL.createObjectURL(f)}" alt="">
+      <span class="bg-name" title="${f.name}">${f.name}</span>
+      <div class="bg-sort-btns">
+        <button class="bg-sort-btn" data-dir="-1" title="위로" ${i === 0 ? 'disabled' : ''}>▲</button>
+        <button class="bg-sort-btn" data-dir="1"  title="아래로" ${i === bgFiles.length - 1 ? 'disabled' : ''}>▼</button>
+      </div>
+      <button class="bg-del" title="삭제">✕</button>`;
+
+    item.querySelector('.bg-del').addEventListener('click', () => {
+      bgFiles.splice(i, 1); renderBgList();
+    });
+    item.querySelectorAll('.bg-sort-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const j = i + parseInt(btn.dataset.dir);
+        if (j < 0 || j >= bgFiles.length) return;
+        [bgFiles[i], bgFiles[j]] = [bgFiles[j], bgFiles[i]];
+        renderBgList();
+      });
+    });
+    list.appendChild(item);
+  });
+
+  if (bgFiles.length > 0) {
+    badge.style.display = 'block';
+    badge.textContent = `총 ${bgFiles.length}장 · 시작 시간은 가사에 맞게 자동 배분됩니다`;
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+// ── Validation ──────────────────────────────────
+function checkReady() {
+  const ok = songs.length > 0 && songs.every(s => s.album && s.audio && (s.lrc || s.srt));
+  document.getElementById('gen-btn').disabled = !ok;
+}
+
+// ── Generate ──────────────────────────────────
+document.getElementById('add-song').addEventListener('click', addSong);
+document.getElementById('gen-btn').addEventListener('click', () => {
+  startGenerate().catch(err => {
+    console.error(err);
+    setStatus('err', '오류: ' + err.message);
+    document.getElementById('gen-btn').disabled = false;
+    activeFileHandle = null;
+  });
+});
+
+let activeFileHandle = null;
+
+async function startGenerate() {
+  activeFileHandle = null;
+
+  if ('showSaveFilePicker' in window) {
+    const rawTitle = songs[0]?.title || '리릭스비디오';
+    const safeName = rawTitle.replace(/[/\\?%*:|"<>]/g, '-') + '.mp4';
+    try {
+      activeFileHandle = await window.showSaveFilePicker({
+        suggestedName: safeName,
+        types: [{ description: 'MP4 비디오', accept: { 'video/mp4': ['.mp4'] } }],
+        startIn: 'videos',
+      });
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      activeFileHandle = null;
+    }
+  }
+
+  const fd = new FormData();
+  fd.append('songCount', songs.length);
+  fd.append('creator', document.getElementById('creator').value);
+
+  songs.forEach((s, i) => {
+    if (s.album) fd.append(`album_${i}`, s.album);
+    if (s.lrc)   fd.append(`lrc_${i}`, s.lrc);
+    if (s.srt)   fd.append(`srt_${i}`, s.srt);
+    if (s.audio) fd.append(`audio_${i}`, s.audio);
+    fd.append(`title_${i}`, s.title || '');
+  });
+
+  // 배경 이미지: 순서대로 같은 필드명으로 전송
+  bgFiles.forEach(f => fd.append('bg', f));
+
+  document.getElementById('gen-btn').disabled = true;
+  document.getElementById('dl-area').style.display = 'none';
+  const sa = document.getElementById('status-area');
+  sa.style.display = 'block';
+  document.getElementById('pbar').style.width = '0%';
+  document.getElementById('pdetail').textContent = '';
+  setStatus('', '파일 업로드 중...');
+
+  fetch('/api/generate', { method: 'POST', body: fd })
+    .then(res => {
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = '';
+      function read() {
+        reader.read().then(({ done, value }) => {
+          if (done) return;
+          buf += dec.decode(value, { stream: true });
+          const parts = buf.split('\n\n');
+          buf = parts.pop();
+          parts.forEach(p => {
+            try { handleEvent(JSON.parse(p.replace(/^data:\s*/, ''))); } catch {}
+          });
+          read();
+        });
+      }
+      read();
+    })
+    .catch(err => { setStatus('err', '연결 오류: ' + err.message); document.getElementById('gen-btn').disabled = false; });
+}
+
+async function handleEvent(evt) {
+  if (evt.type === 'info') {
+    setStatus('', evt.message);
+  } else if (evt.type === 'progress') {
+    const pct = Math.min(100, Math.round(evt.pct));
+    document.getElementById('pbar').style.width = pct + '%';
+    document.getElementById('pdetail').textContent = `${pct}%  ·  ${evt.fps} fps  ·  남은 시간 ${evt.remain}`;
+    setStatus('', '렌더링 중...');
+  } else if (evt.type === 'done') {
+    document.getElementById('pbar').style.width = '100%';
+    document.getElementById('pdetail').textContent = '';
+    showDownloadBtn(evt.url);
+    if (activeFileHandle) {
+      setStatus('', '선택한 위치에 저장 중...');
+      try {
+        const res = await fetch(evt.url);
+        if (!res.ok) throw new Error(`서버 오류 ${res.status}`);
+        const blob = await res.blob();
+        const writable = await activeFileHandle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        setStatus('ok', '저장 완료!');
+        document.getElementById('dl-area').style.display = 'none';
+      } catch (e) {
+        setStatus('err', '저장 실패 — 아래 버튼으로 다운로드하세요.');
+      }
+      activeFileHandle = null;
+    } else {
+      setStatus('', '완료! 아래 버튼으로 다운로드하세요.');
+    }
+    document.getElementById('gen-btn').disabled = false;
+  } else if (evt.type === 'error') {
+    setStatus('err', '❌ ' + evt.message);
+    document.getElementById('gen-btn').disabled = false;
+    activeFileHandle = null;
+  }
+}
+
+function showDownloadBtn(url) {
+  document.getElementById('dl-btn').href = url;
+  document.getElementById('dl-area').style.display = 'block';
+}
+
+function setStatus(cls, msg) {
+  const el = document.getElementById('status-msg');
+  el.textContent = msg;
+  el.className = 'status-msg' + (cls ? ' ' + cls : '');
+}
+
+addSong();
+</script>
+</body>
+</html>
