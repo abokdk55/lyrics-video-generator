@@ -101,7 +101,7 @@ const SH = {'-3':28,'-2':36,'-1':48,'0':76,'1':48,'2':36,'3':28};
 
 const LY = (() => {
   const ly = {};
-  let y = H / 2 - 150;
+  let y = H * 0.75 - 150;
   for (const p of [-3,-2,-1,0,1,2,3]) { ly[p] = y + SH[String(p)] / 2; y += SH[String(p)]; }
   return ly;
 })();
