@@ -63,7 +63,7 @@ header p{font-size:13px;color:var(--text2);letter-spacing:.05em}
 .del-btn:hover{color:rgba(220,100,100,.7)}
 
 /* Upload grid per song */
-.upload-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+.upload-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px}
 .drop{
   border:1px dashed var(--border);border-radius:10px;
   padding:18px 10px;text-align:center;cursor:pointer;
@@ -148,6 +148,15 @@ header p{font-size:13px;color:var(--text2);letter-spacing:.05em}
   outline:none;font-family:inherit;transition:border-color .25s;
 }
 .settings-row input:focus{border-color:var(--border2)}
+.settings-row select{
+  flex:1;max-width:240px;background:var(--card2);border:1px solid var(--border);
+  border-radius:8px;color:var(--text);font-size:13px;padding:10px 14px;
+  outline:none;font-family:inherit;transition:border-color .25s;cursor:pointer;
+  appearance:none;-webkit-appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23c9a96e'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 12px center;
+}
+.settings-row select:focus{border-color:var(--border2)}
 
 /* ── Generate button ─────────────────────────────── */
 .gen-btn{
@@ -192,7 +201,7 @@ footer{text-align:center;margin-top:64px;font-size:10px;color:rgba(201,169,110,.
   <header>
     <div class="hline"></div>
     <h1>리릭스 비디오 생성기</h1>
-    <p>파일을 업로드하고 고품질 리릭스 비디오를 만들어보세요</p>
+    <p>가사 · 음악 · 배경 이미지로 뮤직비디오를 만들어보세요</p>
     <div class="hline" style="margin-top:28px"></div>
   </header>
 
@@ -224,6 +233,28 @@ footer{text-align:center;margin-top:64px;font-size:10px;color:rgba(201,169,110,.
   <div class="settings-row">
     <label>아티스트</label>
     <input type="text" id="creator" value="" placeholder="Andrew An">
+  </div>
+  <div class="settings-row">
+    <label>제목 폰트</label>
+    <select id="titleFont">
+      <option value="DoHyeon">도현체 (기본)</option>
+      <option value="NanumBrush">나눔손글씨 붓</option>
+      <option value="NanumPen">나눔손글씨 펜</option>
+      <option value="Paperlogy">Paperlogy</option>
+      <option value="Freesentation">Freesentation</option>
+      <option value="AppleSD">기본 고딕</option>
+    </select>
+  </div>
+  <div class="settings-row">
+    <label>가사 폰트</label>
+    <select id="lyricFont">
+      <option value="NanumBrush">나눔손글씨 붓 (기본)</option>
+      <option value="NanumPen">나눔손글씨 펜</option>
+      <option value="DoHyeon">도현체</option>
+      <option value="Paperlogy">Paperlogy Light</option>
+      <option value="Freesentation">Freesentation Light</option>
+      <option value="AppleSD">기본 고딕</option>
+    </select>
   </div>
 
   <button class="gen-btn" id="gen-btn" disabled>비디오 생성하기</button>
@@ -258,7 +289,6 @@ function createSongCard(idx) {
       ${songs.length > 0 ? `<button class="del-btn" title="삭제">✕</button>` : ''}
     </div>
     <div class="upload-row">
-      ${makeDropZone('album', idx, '🖼', '앨범 이미지', 'JPG · PNG', 'image/*', true)}
       ${makeDropZone('lrc',   idx, '🎵', 'LRC 파일', '.lrc', '.lrc')}
       ${makeDropZone('srt',   idx, '📄', 'SRT 파일', '.srt · 선택', '.srt')}
       ${makeDropZone('audio', idx, '🎧', '음악 파일', 'MP3 · WAV · M4A', 'audio/*')}
@@ -271,7 +301,7 @@ function createSongCard(idx) {
   const delBtn = card.querySelector('.del-btn');
   if (delBtn) delBtn.addEventListener('click', () => removeSongCard(card, idx));
 
-  ['album','lrc','srt','audio'].forEach(key => {
+  ['lrc','srt','audio'].forEach(key => {
     const zone = card.querySelector(`.drop[data-key="${key}"]`);
     if (!zone) return;
     const input = zone.querySelector('input');
@@ -315,7 +345,7 @@ function setFile(zone, idx, key, file) {
 
 function addSong() {
   const idx = songCount++;
-  songs.push({ title: '', album: null, lrc: null, srt: null, audio: null });
+  songs.push({ title: '', lrc: null, srt: null, audio: null });
   document.getElementById('songs-container').appendChild(createSongCard(idx));
   checkReady();
 }
@@ -390,7 +420,7 @@ function renderBgList() {
 
   if (bgFiles.length > 0) {
     badge.style.display = 'block';
-    badge.textContent = `총 ${bgFiles.length}장 · 시작 시간은 가사에 맞게 자동 배분됩니다`;
+    badge.textContent = `총 ${bgFiles.length}장 · 순서대로 가사 흐름에 맞게 자동 배치됩니다`;
   } else {
     badge.style.display = 'none';
   }
@@ -398,7 +428,7 @@ function renderBgList() {
 
 // ── Validation ──────────────────────────────────
 function checkReady() {
-  const ok = songs.length > 0 && songs.every(s => s.album && s.audio && (s.lrc || s.srt));
+  const ok = songs.length > 0 && songs.every(s => s.audio && (s.lrc || s.srt));
   document.getElementById('gen-btn').disabled = !ok;
 }
 
@@ -436,9 +466,10 @@ async function startGenerate() {
   const fd = new FormData();
   fd.append('songCount', songs.length);
   fd.append('creator', document.getElementById('creator').value);
+  fd.append('titleFont', document.getElementById('titleFont').value);
+  fd.append('lyricFont', document.getElementById('lyricFont').value);
 
   songs.forEach((s, i) => {
-    if (s.album) fd.append(`album_${i}`, s.album);
     if (s.lrc)   fd.append(`lrc_${i}`, s.lrc);
     if (s.srt)   fd.append(`srt_${i}`, s.srt);
     if (s.audio) fd.append(`audio_${i}`, s.audio);

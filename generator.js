@@ -1,9 +1,36 @@
 'use strict';
-const { createCanvas, loadImage } = require('canvas');
+const { createCanvas, loadImage, registerFont } = require('canvas');
 const { execSync, spawn, spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+
+// Register custom fonts from font/ directory next to generator.js
+const FONT_DIR = path.join(__dirname, 'font');
+if (fs.existsSync(FONT_DIR)) {
+  const reg = (file, family, weight = 'normal') => {
+    const p = path.join(FONT_DIR, file);
+    if (fs.existsSync(p)) registerFont(p, { family, weight });
+  };
+  reg('DoHyeon-Regular.ttf',        'DoHyeon');
+  reg('NanumBrushScript-Regular.ttf','NanumBrush');
+  reg('NanumPenScript-Regular.ttf',  'NanumPen');
+  reg('CuteFont-Regular.ttf',        'CuteFont');
+  reg('Paperlogy-1Thin.ttf',         'Paperlogy', '100');
+  reg('Paperlogy-2ExtraLight.ttf',   'Paperlogy', '200');
+  reg('Paperlogy-3Light.ttf',        'Paperlogy', '300');
+  reg('Paperlogy-4Regular.ttf',      'Paperlogy', '400');
+  reg('Paperlogy-5Medium.ttf',       'Paperlogy', '500');
+  reg('Paperlogy-6SemiBold.ttf',     'Paperlogy', '600');
+  reg('Paperlogy-7Bold.ttf',         'Paperlogy', '700');
+  reg('Freesentation-1Thin.ttf',     'Freesentation', '100');
+  reg('Freesentation-2ExtraLight.ttf','Freesentation', '200');
+  reg('Freesentation-3Light.ttf',    'Freesentation', '300');
+  reg('Freesentation-4Regular.ttf',  'Freesentation', '400');
+  reg('Freesentation-5Medium.ttf',   'Freesentation', '500');
+  reg('Freesentation-6SemiBold.ttf', 'Freesentation', '600');
+  reg('Freesentation-7Bold.ttf',     'Freesentation', '700');
+}
 
 function findFfmpeg() {
   if (process.env.FFMPEG_PATH) return process.env.FFMPEG_PATH;
@@ -20,12 +47,53 @@ function findFfmpeg() {
 }
 const FFMPEG = findFfmpeg();
 
-// macOS: Apple SD Gothic Neo, Linux: Noto Sans CJK KR
+// UI/metadata small text
 const FONT = process.platform === 'darwin'
   ? '"Apple SD Gothic Neo"'
   : '"Noto Sans CJK KR", "Noto Sans KR", sans-serif';
 
-const W = 1920, H = 1080, FPS = 30;
+// 기본 가사 폰트 — 나눔손글씨 붓
+const LYRIC_FONT = fs.existsSync(path.join(__dirname, 'font', 'NanumBrushScript-Regular.ttf'))
+  ? '"NanumBrush"' : FONT;
+
+// 기본 타이틀카드 폰트 — 도현체
+const TITLE_FONT = fs.existsSync(path.join(__dirname, 'font', 'DoHyeon-Regular.ttf'))
+  ? '"DoHyeon"' : FONT;
+
+// 손글씨 폰트는 2pt 크게 렌더링
+const HANDWRITING_FONTS = ['NanumBrush', 'NanumPen'];
+function isHandwriting(fontFamily) {
+  return HANDWRITING_FONTS.some(f => fontFamily.includes(f));
+}
+
+// 선택 가능한 폰트 목록 (웹앱·외부에서 참조용)
+const FONT_OPTIONS = {
+  lyric: [
+    { id: 'NanumBrush',   label: '나눔손글씨 붓',       file: 'NanumBrushScript-Regular.ttf' },
+    { id: 'NanumPen',     label: '나눔손글씨 펜',       file: 'NanumPenScript-Regular.ttf' },
+    { id: 'DoHyeon',      label: '도현체',              file: 'DoHyeon-Regular.ttf' },
+    { id: 'Paperlogy',    label: 'Paperlogy Light',    file: 'Paperlogy-3Light.ttf' },
+    { id: 'Freesentation',label: 'Freesentation Light',file: 'Freesentation-3Light.ttf' },
+    { id: 'AppleSD',      label: '기본 고딕',           file: null },
+  ],
+  title: [
+    { id: 'DoHyeon',      label: '도현체',              file: 'DoHyeon-Regular.ttf' },
+    { id: 'NanumBrush',   label: '나눔손글씨 붓',       file: 'NanumBrushScript-Regular.ttf' },
+    { id: 'NanumPen',     label: '나눔손글씨 펜',       file: 'NanumPenScript-Regular.ttf' },
+    { id: 'Paperlogy',    label: 'Paperlogy',          file: 'Paperlogy-4Regular.ttf' },
+    { id: 'Freesentation',label: 'Freesentation',      file: 'Freesentation-4Regular.ttf' },
+    { id: 'AppleSD',      label: '기본 고딕',           file: null },
+  ],
+};
+
+function resolveFontFamily(id) {
+  if (!id || id === 'AppleSD') return FONT;
+  return `"${id}"`;
+}
+
+const W = parseInt(process.env.VIDEO_WIDTH || (process.env.RAILWAY_ENVIRONMENT ? '1280' : '1920'), 10);
+const H = parseInt(process.env.VIDEO_HEIGHT || (process.env.RAILWAY_ENVIRONMENT ? '720' : '1080'), 10);
+const FPS = parseInt(process.env.VIDEO_FPS || (process.env.RAILWAY_ENVIRONMENT ? '24' : '30'), 10);
 
 const FS = {'-3':18,'-2':22,'-1':28,'0':46,'1':28,'2':22,'3':18};
 const FO = {'-3':0.04,'-2':0.12,'-1':0.26,'0':1.0,'1':0.26,'2':0.12,'3':0.04};
@@ -165,25 +233,27 @@ function buildBgImageLayer(img) {
   return c;
 }
 
-function buildLyricsCache(allLyrics) {
+function buildLyricsCache(allLyrics, fontFamily) {
+  const bump = isHandwriting(fontFamily) ? 2 : 0;
   const cache = new Map();
   for (const [, text] of allLyrics) {
     for (const [posStr, sz] of Object.entries(FS)) {
+      const rsz  = sz + bump;
       const wgt  = posStr === '0' ? '400' : '300';
       const glow = posStr === '0';
-      const key  = `${text}__${sz}__${wgt}__${glow}`;
+      const key  = `${text}__${rsz}__${wgt}__${glow}`;
       if (cache.has(key)) continue;
       const mC = createCanvas(10, 10);
       const mX = mC.getContext('2d');
-      mX.font = `${wgt} ${sz}px ${FONT}`;
+      mX.font = `${wgt} ${rsz}px ${fontFamily}`;
       const tw = Math.ceil(mX.measureText(text).width);
       const pad = glow ? 72 : 8;
-      const ch  = sz * (glow ? 3.0 : 2.0) + pad * 2;
+      const ch  = rsz * (glow ? 3.0 : 2.0) + pad * 2;
       const cw  = Math.max(tw + pad * 2, 1);
       const tc  = createCanvas(cw, ch);
       const tx  = tc.getContext('2d');
       tx.textBaseline = 'middle'; tx.textAlign = 'left';
-      tx.font = `${wgt} ${sz}px ${FONT}`;
+      tx.font = `${wgt} ${rsz}px ${fontFamily}`;
       if (glow) {
         tx.shadowColor = 'rgba(201,169,110,0.45)'; tx.shadowBlur = 28;
         tx.fillStyle = '#f5e8d0'; tx.fillText(text, pad, ch/2);
@@ -197,7 +267,70 @@ function buildLyricsCache(allLyrics) {
   return cache;
 }
 
-function drawLyrics(ctx, ts, audioSec, st, cache, allLyrics) {
+function drawTitleCard(ctx, audSec, tc, titleFont) {
+  const { title, subtitle, fadeInEnd = 2.5, fadeOutStart = 9, fadeOutEnd = 12 } = tc;
+  const tFont = titleFont || TITLE_FONT;
+  const bump  = isHandwriting(tFont) ? 2 : 0;
+  let alpha;
+  if (audSec >= fadeOutEnd) return;
+  if (audSec <= fadeInEnd) {
+    alpha = eio(Math.min(1, audSec / fadeInEnd));
+  } else if (audSec >= fadeOutStart) {
+    alpha = eio(1 - (audSec - fadeOutStart) / (fadeOutEnd - fadeOutStart));
+  } else {
+    alpha = 1;
+  }
+  if (alpha <= 0.01) return;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  // Title — font 크기 손글씨 +2pt
+  ctx.font = `normal ${104 + bump}px ${tFont}`;
+  ctx.shadowColor = 'rgba(255, 210, 140, 0.55)';
+  ctx.shadowBlur = 48;
+  ctx.fillStyle = '#fdf0da';
+  ctx.fillText(title, W / 2, H / 2 - 28);
+  ctx.shadowColor = 'rgba(220, 170, 80, 0.28)';
+  ctx.shadowBlur = 90;
+  ctx.fillText(title, W / 2, H / 2 - 28);
+  ctx.shadowBlur = 0;
+
+  // Decorative divider
+  const lw = 180;
+  const ly = H / 2 + 30;
+  const grad = ctx.createLinearGradient(W / 2 - lw, ly, W / 2 + lw, ly);
+  grad.addColorStop(0,   'rgba(201,169,110,0)');
+  grad.addColorStop(0.5, 'rgba(201,169,110,0.7)');
+  grad.addColorStop(1,   'rgba(201,169,110,0)');
+  ctx.strokeStyle = grad;
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(W / 2 - lw, ly);
+  ctx.lineTo(W / 2 + lw, ly);
+  ctx.stroke();
+  // Center diamond
+  ctx.fillStyle = 'rgba(201,169,110,0.7)';
+  ctx.save();
+  ctx.translate(W / 2, ly);
+  ctx.rotate(Math.PI / 4);
+  ctx.fillRect(-3, -3, 6, 6);
+  ctx.restore();
+
+  // Subtitle / creator
+  if (subtitle) {
+    ctx.font = `200 17px ${FONT}`;
+    ctx.fillStyle = 'rgba(201,169,110,0.65)';
+    ctx.fillText(subtitle, W / 2, H / 2 + 62);
+  }
+
+  ctx.restore();
+}
+
+function drawLyrics(ctx, ts, audioSec, st, cache, allLyrics, fontFamily) {
+  const bump = isHandwriting(fontFamily) ? 2 : 0;
   const ni = getIdx(allLyrics, audioSec);
   if (ni !== st.curIdx) { st.prevIdx = st.curIdx; st.curIdx = ni; st.transEndTs = ts + TDUR; }
   if (st.curIdx < 0) return;
@@ -209,7 +342,7 @@ function drawLyrics(ctx, ts, audioSec, st, cache, allLyrics) {
     const li = ai + off;
     if (li < 0 || li >= allLyrics.length) continue;
     const ck = String(off);
-    const cOp = FO[ck], cSz = FS[ck], cY = LY[off];
+    const cOp = FO[ck], cSz = FS[ck] + bump, cY = LY[off];
     let op, y;
     if (inT) {
       const delta = ai - pi, po = off + delta;
@@ -238,7 +371,12 @@ function drawLyrics(ctx, ts, audioSec, st, cache, allLyrics) {
  * outputPath: string
  * onProgress: (pct, fps, remainSec) => void
  */
-async function generateVideo({ songs, backgrounds = [], creator, outputPath, onProgress }) {
+async function generateVideo(options) {
+  const { songs, backgrounds = [], creator, outputPath, onProgress,
+          lyricFont: lyricFontId, titleFont: titleFontId } = options;
+
+  const activeLyricFont = resolveFontFamily(lyricFontId) || LYRIC_FONT;
+  const activeTitleFont = resolveFontFamily(titleFontId) || TITLE_FONT;
   // Probe durations and calculate cumulative offsets
   let cumTime = 0;
   for (const s of songs) {
@@ -263,12 +401,18 @@ async function generateVideo({ songs, backgrounds = [], creator, outputPath, onP
 
   const songCanvases = songs.map(s => buildSongLayer(s.title || '', creator || ''));
 
-  const bgCanvases = await Promise.all(backgrounds.map(async bg => {
-    const img = await loadImage(bg.imagePath);
-    return buildBgImageLayer(img);
-  }));
+  const bgCanvasCache = new Map();
+  async function getBgCanvas(idx) {
+    if (idx < 0 || idx >= backgrounds.length) return null;
+    if (bgCanvasCache.has(idx)) return bgCanvasCache.get(idx);
+    const img = await loadImage(backgrounds[idx].imagePath);
+    const canvas = buildBgImageLayer(img);
+    bgCanvasCache.clear(); // keep only current background to cap memory
+    bgCanvasCache.set(idx, canvas);
+    return canvas;
+  }
 
-  const lyrCache = buildLyricsCache(allLyrics);
+  const lyrCache = buildLyricsCache(allLyrics, activeLyricFont);
 
   const DUST = Array.from({length: 55}, () => ({
     x: Math.random() * W, y: Math.random() * H,
@@ -331,7 +475,10 @@ async function generateVideo({ songs, backgrounds = [], creator, outputPath, onP
     const bgIdx   = getCurrentBgIdx(audSec);
 
     ctx.drawImage(gradCanvas, 0, 0);
-    if (bgIdx >= 0) ctx.drawImage(bgCanvases[bgIdx], 0, 0);
+    if (bgIdx >= 0) {
+      const bgCanvas = await getBgCanvas(bgIdx);
+      if (bgCanvas) ctx.drawImage(bgCanvas, 0, 0);
+    }
     ctx.drawImage(songCanvases[songIdx], 0, 0);
 
     ctx.save();
@@ -344,7 +491,8 @@ async function generateVideo({ songs, backgrounds = [], creator, outputPath, onP
     });
     ctx.restore();
 
-    drawLyrics(ctx, ts_ms, audSec, lyrState, lyrCache, allLyrics);
+    drawLyrics(ctx, ts_ms, audSec, lyrState, lyrCache, allLyrics, activeLyricFont);
+    if (options.titleCard) drawTitleCard(ctx, audSec, options.titleCard, activeTitleFont);
     await writeFrame(canvas.toBuffer('raw'));
 
     if (fi % 90 === 89 || fi === TOTAL_F - 1) {
