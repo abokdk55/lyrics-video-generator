@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>리릭스 비디오 — MP4 변환</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100vh; overflow: hidden;
+      background: #060410;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      font-family: 'Noto Serif KR', serif;
+      color: #f5e8d0;
+    }
+    #cv {
+      width: 960px; height: 540px;
+      display: block;
+      border: 1px solid rgba(201,169,110,0.12);
+    }
+    .ctrl {
+      margin-top: 24px;
+      display: flex; gap: 14px; align-items: center;
+    }
+    .btn {
+      padding: 10px 28px;
+      border: 1px solid rgba(201,169,110,0.35);
+      background: transparent;
+      font-family: inherit; font-size: 11px; letter-spacing: 0.26em;
+      color: rgba(201,169,110,0.75);
+      cursor: pointer; transition: all 0.25s;
+      text-decoration: none; display: inline-block;
+    }
+    .btn:hover:not([disabled]) {
+      background: rgba(201,169,110,0.08);
+      border-color: rgba(201,169,110,0.6);
+      color: #f5e8d0;
+    }
+    .btn[disabled] { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
+    .btn.accent { border-color: rgba(100,170,220,0.5); color: rgba(130,190,235,0.85); }
+    .btn.accent:hover:not([disabled]) {
+      background: rgba(100,170,220,0.07);
+      border-color: rgba(100,170,220,0.8);
+      color: rgba(160,210,245,1);
+    }
+    #prog-wrap {
+      margin-top: 18px;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 9px;
+    }
+    .prog-outer {
+      width: 440px; height: 1px;
+      background: rgba(201,169,110,0.10);
+      position: relative;
+    }
+    .prog-inner {
+      position: absolute; inset: -0.5px 0;
+      width: 0%;
+      background: linear-gradient(90deg, rgba(201,169,110,0.3), rgba(201,169,110,0.7));
+      transition: width 0.5s ease;
+    }
+    #prog-label {
+      font-size: 10px; letter-spacing: 0.22em;
+      color: rgba(201,169,110,0.38);
+      text-align: center;
+    }
+    #status {
+      margin-top: 14px; min-height: 15px;
+      font-size: 10px; letter-spacing: 0.2em;
+      color: rgba(201,169,110,0.32); text-align: center;
+    }
+    .note {
+      position: fixed; bottom: 20px;
+      font-size: 9px; letter-spacing: 0.12em;
+      color: rgba(201,169,110,0.15); text-align: center; line-height: 2;
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="cv" width="1920" height="1080"></canvas>
+
+<div class="ctrl">
+  <button class="btn"        id="btnPlay" onclick="togglePlay()">▶ 미리보기</button>
+  <button class="btn accent" id="btnEnc"  onclick="startEncode()">⬛ MP4 변환 시작</button>
+  <a     class="btn"         id="btnDl"   style="display:none">⬇ MP4 다운로드</a>
+</div>
+
+<div id="prog-wrap">
+  <div class="prog-outer"><div class="prog-inner" id="prog"></div></div>
+  <div id="prog-label">준비 중...</div>
+</div>
+
+<div id="status">미리보기로 확인 후 MP4 변환을 시작하세요</div>
+
+<div class="note">
+  Chrome 94 이상 권장 · 변환은 약 30~90초 소요됩니다 (실시간 재생 불필요)<br>
+  변환 중 탭을 최소화하거나 닫지 마세요
+</div>
+
+<audio id="aud" src="오래된 사진첩 — 그때는 몰랐던 사랑.mp3" preload="auto"></audio>
+
+<script>
+// ── Lyrics ───────────────────────────────────────────────────────────────
+const L = [
+  [1.59,   "낡은 서랍 깊은 곳에서"],
+  [2.95,   "낡은 서랍 깊은 곳에서"],
+  [8.37,   "먼지 쌓인 기억을 꺼냈죠"],
+  [15.16,  "조심스레 펼친 사진첩엔"],
+  [21.94,  "잊고 살던 시간이 잠들어"],
+  [28.88,  "빛바랜 사진 한 장 속에"],
+  [35.42,  "어린 내가 웃고 있었죠"],
+  [39.57,  "작은 손을 꼭 잡아주던"],
+  [48.51,  "그대의 젊은 얼굴도 보여요"],
+  [55.69,  "그때 나는 알지 못했죠"],
+  [58.88,  "그 웃음 뒤에 숨은 마음을"],
+  [62.39,  "매일 나를 위해 접어두던"],
+  [66.22,  "그대의 하루와 꿈들을"],
+  [70.05,  "한 장 한 장 넘길 때마다"],
+  [79.38,  "가슴 깊이 번지는 말"],
+  [86.17,  "너무 늦게 알아버린"],
+  [92.63,  "그 사랑이 눈물이 되어"],
+  [99.25,  "그때는 몰랐던 사랑"],
+  [102.20, "너무 가까워 보이지 않던 마음"],
+  [110.02, "사진 속 그대는 아직도 젊은데"],
+  [116.56, "나는 이제야 그 마음을 알아요"],
+  [122.87, "그때는 몰랐던 사랑"],
+  [126.62, "당연한 줄 알았던 따뜻한 손길"],
+  [131.09, "세월이 지나고 나서야"],
+  [140.18, "고맙다는 말이 내 안에 피어요"],
+  [147.36, "낡은 마루, 저녁 밥 냄새"],
+  [153.66, "문밖에서 부르던 목소리"],
+  [157.89, "작은 방에 켜진 불빛 하나"],
+  [167.23, "그게 나의 세상이었죠"],
+  [174.25, "괜찮다며 웃어주시던"],
+  [177.20, "그 말 뒤에 감춘 눈물들"],
+  [181.19, "내가 잠든 밤에도 홀로"],
+  [184.30, "내일을 걱정하던 마음"],
+  [187.58, "한 장 한 장 넘길 때마다"],
+  [191.09, "잊은 줄 알았던 계절"],
+  [194.76, "돌아갈 수 없는 날들이"],
+  [198.11, "따뜻하게 나를 안아요"],
+  [204.01, "그때는 몰랐던 사랑"],
+  [208.24, "너무 가까워 보이지 않던 마음"],
+  [214.70, "사진 속 그대는 아직도 젊은데"],
+  [218.85, "나는 이제야 그 마음을 알아요"],
+  [227.71, "그때는 몰랐던 사랑"],
+  [231.46, "당연한 줄 알았던 따뜻한 손길"],
+  [238.40, "세월이 지나고 나서야"],
+  [244.94, "고맙다는 말이 내 안에 피어요"],
+  [249.09, "혹시 그날로 돌아간다면"],
+  [255.39, "나는 꼭 말하고 싶어요"],
+  [259.38, "당신의 작은 희생들이"],
+  [264.89, "내 삶을 지켜준 빛이었다고"],
+  [271.43, "말없이 내 곁을 지켜준 사람"],
+  [278.77, "언제나 나보다 나를 믿던 사람"],
+  [285.55, "늦었지만 이제야 불러봅니다"],
+  [292.33, "고마워요, 사랑했어요"],
+  [298.64, "그때는 몰랐던 사랑"],
+  [302.47, "시간이 지나 더 선명해진 마음"],
+  [309.41, "사진 속 그대는 아직도 웃는데"],
+  [316.03, "나는 조용히 눈물을 닦아요"],
+  [322.33, "그때는 몰랐던 사랑"],
+  [325.77, "내 삶 곳곳에 남겨진 따뜻한 흔적"],
+  [333.11, "한 장의 사진을 품에 안고"],
+  [339.65, "이제야 그 사랑을 불러봅니다"],
+  [346.83, "오래된 사진첩을 덮으면"],
+  [350.26, "방 안에 조용히 남는 말"],
+  [354.09, "그때는 몰랐던 사랑"],
+  [360.87, "이제는 내가 기억할게요"],
+];
+
+// ── Canvas constants ──────────────────────────────────────────────────
+const canvas = document.getElementById('cv');
+const ctx    = canvas.getContext('2d');
+const W = 1920, H = 1080;
+const FPS = 30;
+const SONG_SEC = 366.5; // ~6:06.5
+
+const SEP_X  = W * 0.42;
+const ALB_CX = SEP_X / 2;
+const ALB_CY = H / 2;
+const ALB_SZ = 380;
+const LYR_X  = SEP_X + 72;
+
+// Font / opacity lookup by slot position
+const FS = {'-3':19,'-2':23,'-1':29,'0':47,'1':29,'2':23,'3':19};
+const FO = {'-3':0.04,'-2':0.12,'-1':0.26,'0':1.0,'1':0.26,'2':0.12,'3':0.04};
+const FW = {'-3':'300','-2':'300','-1':'300','0':'400','1':'300','2':'300','3':'300'};
+
+// Slot center-Y positions — total stack 300px centered at 540
+const SH = {'-3':28,'-2':36,'-1':48,'0':76,'1':48,'2':36,'3':28};
+const LY = {};
+{ let y = H/2 - 150;
+  for (const p of [-3,-2,-1,0,1,2,3]) { LY[p] = y + SH[String(p)]/2; y += SH[String(p)]; }
+}
+
+const TDUR = 550; // lyric transition duration ms
+
+// ── Particles (shared across preview + encode) ─────────────────────────
+const DUST = Array.from({length: 60}, () => ({
+  x: Math.random() * W,  y: Math.random() * H,
+  r: Math.random() * 1.4 + 0.3,
+  vx: (Math.random() - 0.5) * 0.10,
+  vy: -(Math.random() * 0.14 + 0.04),
+  a: Math.random() * 0.28 + 0.05,
+}));
+
+// ── Album image ────────────────────────────────────────────────────────
+const albumImg = new Image();
+albumImg.src = '오래된 사진첩 — 그때는 몰랐던 사랑.jpeg';
+
+// ── Helpers ────────────────────────────────────────────────────────────
+function getIdx(t) {
+  let i = -1;
+  for (let j = 0; j < L.length; j++) { if (t >= L[j][0]) i = j; else break; }
+  return i;
+}
+function eio(t) { return t < 0.5 ? 2*t*t : -1+(4-2*t)*t; }
+function lerp(a, b, t) { return a + (b-a)*t; }
+function makeLyrState() { return { curIdx: -1, prevIdx: -1, transEndTs: 0 }; }
+
+// ── Draw: background ──────────────────────────────────────────────────
+// vMul: velocity multiplier (1 for preview ~60fps, 2 for encode @30fps)
+function drawBg(ts, vMul) {
+  ctx.clearRect(0, 0, W, H);
+  const g1 = ctx.createLinearGradient(0, 0, W, H);
+  g1.addColorStop(0,    '#0c0a16');
+  g1.addColorStop(0.38, '#100d1b');
+  g1.addColorStop(0.62, '#18120a');
+  g1.addColorStop(1,    '#0e0b16');
+  ctx.fillStyle = g1; ctx.fillRect(0, 0, W, H);
+
+  const ga = ctx.createRadialGradient(ALB_CX, ALB_CY, 0, ALB_CX, ALB_CY, W*0.35);
+  ga.addColorStop(0, 'rgba(168,118,52,0.11)');
+  ga.addColorStop(.5,'rgba(130,85,35,0.04)');
+  ga.addColorStop(1, 'transparent');
+  ctx.fillStyle = ga; ctx.fillRect(0, 0, W, H);
+
+  const gv = ctx.createRadialGradient(W/2,H/2,H*0.22, W/2,H/2,H*0.86);
+  gv.addColorStop(0,'transparent'); gv.addColorStop(1,'rgba(0,0,0,0.56)');
+  ctx.fillStyle = gv; ctx.fillRect(0, 0, W, H);
+
+  const gt = ctx.createLinearGradient(0,0,0,H*0.20);
+  gt.addColorStop(0,'rgba(0,0,0,0.30)'); gt.addColorStop(1,'transparent');
+  ctx.fillStyle = gt; ctx.fillRect(0, 0, W, H);
+
+  DUST.forEach(p => {
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(215,188,132,${p.a})`; ctx.fill();
+    p.x += p.vx * vMul; p.y += p.vy * vMul;
+    if (p.y < -4) { p.y = H+4; p.x = Math.random()*W; }
+    if (p.x < -4) p.x = W+4;
+    if (p.x > W+4) p.x = -4;
+  });
+}
+
+// ── Draw: separator ───────────────────────────────────────────────────
+function drawSep() {
+  const sg = ctx.createLinearGradient(0, H*.08, 0, H*.92);
+  sg.addColorStop(0,'transparent'); sg.addColorStop(.2,'rgba(201,169,110,0.07)');
+  sg.addColorStop(.5,'rgba(201,169,110,0.15)'); sg.addColorStop(.8,'rgba(201,169,110,0.07)');
+  sg.addColorStop(1,'transparent');
+  ctx.save(); ctx.strokeStyle = sg; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(SEP_X, H*.08); ctx.lineTo(SEP_X, H*.92); ctx.stroke();
+  ctx.restore();
+}
+
+// ── Draw: album ───────────────────────────────────────────────────────
+function drawAlbum(ts) {
+  if (!albumImg.complete || !albumImg.naturalWidth) return;
+  const t1 = ts * 0.001;
+  const r1 = 280*(1+0.06*Math.sin(t1*Math.PI*2/7.0));
+  const gh1 = ctx.createRadialGradient(ALB_CX,ALB_CY,0, ALB_CX,ALB_CY,r1);
+  gh1.addColorStop(0,'rgba(175,125,60,0.06)'); gh1.addColorStop(1,'transparent');
+  ctx.fillStyle = gh1; ctx.fillRect(ALB_CX-r1, ALB_CY-r1, r1*2, r1*2);
+
+  const r2 = 220*(1+0.07*Math.sin(t1*Math.PI*2/5.5));
+  const gh2 = ctx.createRadialGradient(ALB_CX,ALB_CY,0, ALB_CX,ALB_CY,r2);
+  gh2.addColorStop(0,'rgba(178,128,58,0.16)'); gh2.addColorStop(.55,'rgba(150,100,45,0.06)');
+  gh2.addColorStop(1,'transparent');
+  ctx.fillStyle = gh2; ctx.fillRect(ALB_CX-r2, ALB_CY-r2, r2*2, r2*2);
+
+  const sc = 1 + 0.009*Math.sin(t1*Math.PI*2/6.5);
+  const sz = ALB_SZ*sc, ax = ALB_CX-sz/2, ay = ALB_CY-sz/2;
+  ctx.save();
+  ctx.filter = 'sepia(20%) contrast(1.07) brightness(0.86) saturate(0.88)';
+  ctx.drawImage(albumImg, ax, ay, sz, sz);
+  ctx.filter = 'none';
+  const es = ctx.createRadialGradient(ALB_CX,ALB_CY,sz*.34, ALB_CX,ALB_CY,sz*.72);
+  es.addColorStop(0,'transparent'); es.addColorStop(1,'rgba(0,0,0,0.20)');
+  ctx.fillStyle = es; ctx.fillRect(ax, ay, sz, sz);
+  ctx.restore();
+}
+
+// ── Draw: metadata ────────────────────────────────────────────────────
+function drawMeta() {
+  ctx.save(); ctx.textAlign = 'right'; ctx.textBaseline = 'alphabetic';
+  ctx.font = '300 15px "Noto Serif KR", serif';
+  ctx.fillStyle = 'rgba(201,169,110,0.50)';
+  ctx.fillText('오래된 사진첩 — 그때는 몰랐던 사랑', W-68, 95);
+  ctx.font = '300 13px "Noto Serif KR", serif';
+  ctx.fillStyle = 'rgba(201,169,110,0.22)';
+  ctx.fillText('mintorain', W-68, 120);
+  ctx.restore();
+}
+
+// ── Draw: lyrics ──────────────────────────────────────────────────────
+// ts: animation timestamp (ms), audioTime: song position (sec), st: lyrics state object
+function drawLyrics(ts, audioTime, st) {
+  const ni = getIdx(audioTime);
+  if (ni !== st.curIdx) {
+    st.prevIdx = st.curIdx; st.curIdx = ni; st.transEndTs = ts + TDUR;
+  }
+  if (st.curIdx < 0) return;
+
+  const ai = st.curIdx, pi = st.prevIdx;
+  const raw = st.transEndTs > ts ? 1 - (st.transEndTs - ts) / TDUR : 1.0;
+  const pr  = eio(Math.max(0, Math.min(1, raw)));
+  const inT = pr < 1.0 && pi >= 0;
+
+  for (let off = -3; off <= 3; off++) {
+    const li = ai + off;
+    if (li < 0 || li >= L.length) continue;
+    const ck = String(off);
+    const cSz = FS[ck], cOp = FO[ck], cY = LY[off];
+    let sz, op, y;
+
+    if (inT) {
+      const delta = ai - pi, po = off + delta;
+      const pk  = String(Math.max(-3, Math.min(3, po)));
+      const pSz = (po>=-3&&po<=3) ? FS[pk] : 14;
+      const pOp = (po>=-3&&po<=3) ? FO[pk] :  0;
+      const pY  = (po>=-3&&po<=3) ? LY[po]  : (po<-3 ? LY[-3]-40 : LY[3]+40);
+      sz = lerp(pSz, cSz, pr); op = lerp(pOp, cOp, pr); y = lerp(pY, cY, pr);
+    } else { sz = cSz; op = cOp; y = cY; }
+
+    ctx.save();
+    ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+    ctx.globalAlpha  = op; ctx.fillStyle = '#f5e8d0';
+    ctx.font = `${FW[ck]} ${Math.round(sz)}px "Noto Serif KR", serif`;
+    if (off === 0) {
+      ctx.shadowColor = 'rgba(201,169,110,0.42)'; ctx.shadowBlur = 30;
+      ctx.fillText(L[li][1], LYR_X, y);
+      ctx.shadowColor = 'rgba(201,169,110,0.15)'; ctx.shadowBlur = 62;
+    }
+    ctx.fillText(L[li][1], LYR_X, y);
+    ctx.restore();
+  }
+}
+
+// ── Preview loop ──────────────────────────────────────────────────────
+const aud = document.getElementById('aud');
+const prvSt = makeLyrState();
+let previewing = false;
+
+function previewFrame(ts) {
+  drawBg(ts, 1);
+  drawSep(); drawAlbum(ts); drawMeta();
+  drawLyrics(ts, aud.currentTime, prvSt);
+  if (previewing) requestAnimationFrame(previewFrame);
+}
+
+// Initial idle render
+document.fonts.ready.then(() => {
+  previewing = true;
+  requestAnimationFrame(previewFrame);
+});
+
+function togglePlay() {
+  const btn = document.getElementById('btnPlay');
+  if (aud.paused) {
+    aud.play().catch(()=>{});
+    btn.textContent = '⏸ 일시정지';
+  } else {
+    aud.pause();
+    btn.textContent = '▶ 미리보기';
+  }
+}
+aud.addEventListener('ended', () => {
+  document.getElementById('btnPlay').textContent = '▶ 미리보기';
+});
+
+// ── MP4 encoding ──────────────────────────────────────────────────────
+function setStatus(txt) { document.getElementById('status').innerHTML = txt; }
+function setProgress(pct, label) {
+  document.getElementById('prog').style.width = (pct*100).toFixed(1) + '%';
+  document.getElementById('prog-label').textContent = label;
+}
+
+async function startEncode() {
+  // Browser capability check
+  if (typeof VideoEncoder === 'undefined') {
+    setStatus('⚠️ Chrome 94 이상 또는 Edge에서 실행해 주세요');
+    return;
+  }
+
+  // Disable controls
+  document.getElementById('btnEnc').setAttribute('disabled','');
+  document.getElementById('btnPlay').setAttribute('disabled','');
+  aud.pause();
+
+  const pw = document.getElementById('prog-wrap');
+  pw.style.display = 'flex';
+  setProgress(0, '라이브러리 로딩 중...');
+  setStatus('MP4 변환을 준비하고 있습니다...');
+
+  // Load mp4-muxer (ESM from CDN)
+  let Muxer, ArrayBufferTarget;
+  try {
+    const mod = await import('https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.7/build/mp4-muxer.js');
+    Muxer = mod.Muxer; ArrayBufferTarget = mod.ArrayBufferTarget;
+  } catch(e) {
+    setStatus('⚠️ 라이브러리 로드 실패 — 인터넷 연결을 확인하세요');
+    document.getElementById('btnEnc').removeAttribute('disabled');
+    document.getElementById('btnPlay').removeAttribute('disabled');
+    return;
+  }
+
+  // Wait for fonts + image
+  await document.fonts.ready;
+  await Promise.all([
+    document.fonts.load('300 46px "Noto Serif KR"'),
+    document.fonts.load('400 46px "Noto Serif KR"'),
+  ]);
+  await new Promise((res, rej) => {
+    if (albumImg.complete) res();
+    else { albumImg.onload = res; albumImg.onerror = rej; }
+  });
+
+  // ── Setup muxer ──
+  const target = new ArrayBufferTarget();
+  const muxer  = new Muxer({
+    target,
+    video: { codec: 'avc', width: W, height: H },
+    audio: { codec: 'aac', sampleRate: 44100, numberOfChannels: 2 },
+    fastStart: 'in-memory',
+  });
+
+  // ── Setup video encoder ──
+  const videoCfg = {
+    codec: 'avc1.640028',      // H.264 High Profile Level 4.0
+    width: W, height: H,
+    bitrate: 8_000_000,
+    framerate: FPS,
+    hardwareAcceleration: 'prefer-hardware',
+  };
+  const vSupport = await VideoEncoder.isConfigSupported(videoCfg);
+  if (!vSupport.supported) videoCfg.hardwareAcceleration = 'prefer-software';
+
+  const videoEncoder = new VideoEncoder({
+    output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+    error: e => console.error('VideoEncoder:', e),
+  });
+  videoEncoder.configure(videoCfg);
+
+  // ── Setup audio encoder ──
+  const audioEncoder = new AudioEncoder({
+    output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
+    error: e => console.error('AudioEncoder:', e),
+  });
+  audioEncoder.configure({
+    codec: 'mp4a.40.2',    // AAC-LC
+    sampleRate: 44100,
+    numberOfChannels: 2,
+    bitrate: 192_000,
+  });
+
+  // ── Decode audio ──
+  setProgress(0.02, '오디오 디코딩 중...');
+  setStatus('음악 파일을 처리하고 있습니다...');
+  let audioBuffer;
+  try {
+    const response = await fetch('오래된 사진첩 — 그때는 몰랐던 사랑.mp3');
+    const arrayBuf = await response.arrayBuffer();
+    const ac = new OfflineAudioContext(2, 44100 * SONG_SEC, 44100);
+    audioBuffer = await ac.decodeAudioData(arrayBuf);
+  } catch(e) {
+    setStatus('⚠️ 오디오 파일 로드 실패: ' + e.message);
+    return;
+  }
+
+  // ── Encode audio ──
+  setProgress(0.04, '오디오 인코딩 중...');
+  const nCh = audioBuffer.numberOfChannels;
+  const sampleRate = audioBuffer.sampleRate;
+  const ACHUNK = 4096;
+  for (let off = 0; off < audioBuffer.length; off += ACHUNK) {
+    const nf = Math.min(ACHUNK, audioBuffer.length - off);
+    const data = new Float32Array(nf * nCh);
+    for (let ch = 0; ch < nCh; ch++) {
+      data.set(audioBuffer.getChannelData(ch).subarray(off, off + nf), ch * nf);
+    }
+    const ad = new AudioData({
+      format: 'f32-planar', sampleRate,
+      numberOfFrames: nf, numberOfChannels: nCh,
+      timestamp: Math.round(off / sampleRate * 1_000_000),
+      data,
+    });
+    audioEncoder.encode(ad);
+    ad.close();
+    if (off % (ACHUNK * 50) === 0) await new Promise(r => setTimeout(r, 0));
+  }
+  await audioEncoder.flush();
+
+  // ── Encode video frames ──
+  const totalFrames = Math.ceil(SONG_SEC * FPS);
+  const encSt = makeLyrState();
+  previewing = false; // stop preview loop
+
+  for (let fi = 0; fi < totalFrames; fi++) {
+    const ts_ms  = fi / FPS * 1000;
+    const ts_us  = Math.round(ts_ms * 1000);
+    const audSec = fi / FPS;
+
+    drawBg(ts_ms, 2); // vMul=2: compensate 30fps vs 60fps preview
+    drawSep();
+    drawAlbum(ts_ms);
+    drawMeta();
+    drawLyrics(ts_ms, audSec, encSt);
+
+    const frame = new VideoFrame(canvas, {
+      timestamp: ts_us,
+      duration:  Math.round(1_000_000 / FPS),
+    });
+    // Backpressure
+    while (videoEncoder.encodeQueueSize > 25) {
+      await new Promise(r => setTimeout(r, 15));
+    }
+    videoEncoder.encode(frame, { keyFrame: fi % (FPS * 2) === 0 });
+    frame.close();
+
+    // Progress update + yield every 15 frames
+    if (fi % 15 === 14) {
+      const pct  = (fi + 1) / totalFrames;
+      const done = Math.floor(fi / FPS);
+      const tot  = Math.floor(SONG_SEC);
+      setProgress(0.06 + pct * 0.9, `비디오 인코딩 중 ${(pct*100).toFixed(0)}%  —  ${fmt(done)} / ${fmt(tot)}`);
+      setStatus(`프레임 ${fi + 1} / ${totalFrames}`);
+      await new Promise(r => setTimeout(r, 0));
+    }
+  }
+
+  // ── Finalize ──
+  setProgress(0.97, '파일 생성 중...');
+  setStatus('MP4 패키징 중입니다...');
+  await videoEncoder.flush();
+  muxer.finalize();
+
+  const blob = new Blob([target.buffer], { type: 'video/mp4' });
+  const url  = URL.createObjectURL(blob);
+
+  const dl      = document.getElementById('btnDl');
+  dl.href       = url;
+  dl.download   = '오래된_사진첩_리릭스비디오.mp4';
+  dl.style.display = 'inline';
+
+  setProgress(1.0, '완료');
+  setStatus('✓ MP4 변환 완료 · 아래 다운로드 버튼을 클릭하세요');
+  document.getElementById('btnEnc').removeAttribute('disabled');
+  document.getElementById('btnPlay').removeAttribute('disabled');
+
+  // Restart preview
+  previewing = true;
+  Object.assign(prvSt, makeLyrState());
+  requestAnimationFrame(previewFrame);
+}
+
+function fmt(s) {
+  return `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+}
+</script>
+</body>
+</html>

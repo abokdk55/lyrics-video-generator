@@ -95,7 +95,7 @@ const W = parseInt(process.env.VIDEO_WIDTH || (process.env.RAILWAY_ENVIRONMENT ?
 const H = parseInt(process.env.VIDEO_HEIGHT || (process.env.RAILWAY_ENVIRONMENT ? '720' : '1080'), 10);
 const FPS = parseInt(process.env.VIDEO_FPS || (process.env.RAILWAY_ENVIRONMENT ? '24' : '30'), 10);
 
-const FS = {'-3':18,'-2':22,'-1':28,'0':46,'1':28,'2':22,'3':18};
+const FS = {'-3':19,'-2':23,'-1':29,'0':47,'1':29,'2':23,'3':19};
 const FO = {'-3':0.04,'-2':0.12,'-1':0.26,'0':1.0,'1':0.26,'2':0.12,'3':0.04};
 const SH = {'-3':28,'-2':36,'-1':48,'0':76,'1':48,'2':36,'3':28};
 
@@ -268,7 +268,13 @@ function buildLyricsCache(allLyrics, fontFamily) {
 }
 
 function drawTitleCard(ctx, audSec, tc, titleFont) {
-  const { title, subtitle, fadeInEnd = 2.5, fadeOutStart = 9, fadeOutEnd = 12 } = tc;
+  if (!tc) return;
+  const title = String(tc.title || '').trim();
+  if (!title) return;
+  const subtitle = String(tc.subtitle || '').trim();
+  const fadeInEnd = tc.fadeInEnd !== undefined ? Number(tc.fadeInEnd) : 2.5;
+  const fadeOutStart = tc.fadeOutStart !== undefined ? Number(tc.fadeOutStart) : 9;
+  const fadeOutEnd = tc.fadeOutEnd !== undefined ? Number(tc.fadeOutEnd) : 12;
   const tFont = titleFont || TITLE_FONT;
   const bump  = isHandwriting(tFont) ? 2 : 0;
   let alpha;

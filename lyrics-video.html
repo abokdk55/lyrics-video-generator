@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>오래된 사진첩</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%; height: 100vh; overflow: hidden;
+      background: #0c0a16;
+      font-family: 'Noto Serif KR', 'Malgun Gothic', serif;
+      -webkit-font-smoothing: antialiased;
+      cursor: default;
+      user-select: none;
+    }
+
+    /* ── Background canvas ── */
+    #bg {
+      position: fixed; inset: 0;
+      z-index: 0; pointer-events: none;
+    }
+
+    /* Film grain overlay */
+    body::after {
+      content: '';
+      position: fixed; inset: 0; z-index: 5;
+      pointer-events: none;
+      background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.72' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)' opacity='0.035'/%3E%3C/svg%3E");
+      background-size: 300px 300px;
+      opacity: 0.45;
+      mix-blend-mode: overlay;
+    }
+
+    /* ── Scene layout ── */
+    .scene {
+      position: relative; z-index: 1;
+      width: 100vw; height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      justify-content: flex-end;
+      padding: 46px 66px 0;
+      position: relative; z-index: 2;
+    }
+
+    .meta { text-align: right; }
+
+    .meta-title {
+      font-size: 11px; font-weight: 300;
+      letter-spacing: 0.28em;
+      color: rgba(201, 169, 110, 0.52);
+      margin-bottom: 8px;
+    }
+
+    .meta-artist {
+      font-size: 10px; font-weight: 300;
+      letter-spacing: 0.52em;
+      color: rgba(201, 169, 110, 0.22);
+    }
+
+    /* ── Main split ── */
+    .main {
+      display: grid;
+      grid-template-columns: 42% 58%;
+      align-items: center;
+      position: relative;
+      padding-bottom: 30px;
+    }
+
+    /* Vertical separator */
+    .sep {
+      position: absolute;
+      left: 42%; top: 8%; bottom: 8%;
+      width: 1px;
+      background: linear-gradient(
+        180deg,
+        transparent 0%,
+        rgba(201,169,110,0.08) 20%,
+        rgba(201,169,110,0.16) 50%,
+        rgba(201,169,110,0.08) 80%,
+        transparent 100%
+      );
+    }
+
+    /* ── Album side ── */
+    .album-side {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 36px 40px;
+    }
+
+    .album-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .halo {
+      position: absolute;
+      width: 440px; height: 440px;
+      border-radius: 50%;
+      background: radial-gradient(
+        circle,
+        rgba(180, 128, 58, 0.15) 0%,
+        rgba(150, 95, 42, 0.06) 45%,
+        transparent 68%
+      );
+      animation: halo 5.5s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    .halo-outer {
+      position: absolute;
+      width: 560px; height: 560px;
+      border-radius: 50%;
+      background: radial-gradient(
+        circle,
+        rgba(180, 120, 50, 0.05) 0%,
+        transparent 60%
+      );
+      animation: halo 7s ease-in-out infinite reverse;
+      pointer-events: none;
+    }
+
+    .album-img {
+      width: 300px; height: 300px;
+      object-fit: cover;
+      display: block;
+      position: relative; z-index: 2;
+      filter: sepia(20%) contrast(1.07) brightness(0.86) saturate(0.88);
+      box-shadow:
+        0 6px 40px rgba(0,0,0,0.80),
+        0 0 80px rgba(175,125,58,0.07),
+        inset 0 0 0 1px rgba(201,169,110,0.06);
+      animation: breathe 6.5s ease-in-out infinite;
+    }
+
+    @keyframes halo {
+      0%,100% { opacity: 0.55; transform: scale(1); }
+      50%      { opacity: 1;    transform: scale(1.07); }
+    }
+    @keyframes breathe {
+      0%,100% { transform: scale(1); }
+      50%      { transform: scale(1.009); }
+    }
+
+    /* ── Lyrics side ── */
+    .lyrics-side {
+      padding: 0 70px 40px 54px;
+      display: flex;
+      align-items: center;
+      min-height: 0;
+    }
+
+    .lyrics-stack {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    /* Base transition for all lines */
+    .lline {
+      transition:
+        font-size   0.65s cubic-bezier(0.23, 1, 0.32, 1),
+        color       0.65s cubic-bezier(0.23, 1, 0.32, 1),
+        opacity     0.65s cubic-bezier(0.23, 1, 0.32, 1),
+        text-shadow 0.65s ease,
+        padding     0.65s cubic-bezier(0.23, 1, 0.32, 1),
+        letter-spacing 0.65s ease;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: clip;
+      line-height: 1.4;
+    }
+
+    /* Context lines — progressively dimmer */
+    .lline[data-pos="-3"] {
+      font-size: 15px; font-weight: 300;
+      color: rgba(245, 232, 208, 0.04);
+      padding: 5px 0;
+      letter-spacing: 0.01em;
+    }
+    .lline[data-pos="-2"] {
+      font-size: 18px; font-weight: 300;
+      color: rgba(245, 232, 208, 0.12);
+      padding: 6px 0;
+      letter-spacing: 0.01em;
+    }
+    .lline[data-pos="-1"] {
+      font-size: 22px; font-weight: 300;
+      color: rgba(245, 232, 208, 0.26);
+      padding: 7px 0;
+      letter-spacing: 0.02em;
+    }
+
+    /* Active line */
+    .lline[data-pos="0"] {
+      font-size: 35px; font-weight: 400;
+      color: #f5e8d0;
+      text-shadow:
+        0 0 26px rgba(201,169,110,0.42),
+        0 0 52px rgba(201,169,110,0.14),
+        0 0 100px rgba(201,169,110,0.05);
+      letter-spacing: 0.045em;
+      padding: 11px 0;
+    }
+
+    .lline[data-pos="1"] {
+      font-size: 22px; font-weight: 300;
+      color: rgba(245, 232, 208, 0.26);
+      padding: 7px 0;
+      letter-spacing: 0.02em;
+    }
+    .lline[data-pos="2"] {
+      font-size: 18px; font-weight: 300;
+      color: rgba(245, 232, 208, 0.12);
+      padding: 6px 0;
+      letter-spacing: 0.01em;
+    }
+    .lline[data-pos="3"] {
+      font-size: 15px; font-weight: 300;
+      color: rgba(245, 232, 208, 0.04);
+      padding: 5px 0;
+      letter-spacing: 0.01em;
+    }
+
+    /* Empty slot placeholder */
+    .lline-empty { padding: 5px 0; min-height: 24px; }
+
+    /* Fade-in animation for new active line */
+    @keyframes lineIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .lline[data-pos="0"] { animation: lineIn 0.5s ease forwards; }
+
+    /* ── Play hint ── */
+    .hint {
+      position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
+      font-size: 10px; letter-spacing: 0.38em;
+      color: rgba(201, 169, 110, 0.28);
+      z-index: 10;
+      animation: fadeHint 4.5s ease 1.5s forwards;
+      pointer-events: none;
+    }
+    @keyframes fadeHint {
+      0%,55% { opacity: 1; } 100% { opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="bg"></canvas>
+
+<div class="scene">
+  <header>
+    <div class="meta">
+      <div class="meta-title">오래된 사진첩 — 그때는 몰랐던 사랑</div>
+      <div class="meta-artist">mintorain</div>
+    </div>
+  </header>
+
+  <div class="main">
+    <div class="sep"></div>
+
+    <div class="album-side">
+      <div class="album-wrap">
+        <div class="halo-outer"></div>
+        <div class="halo"></div>
+        <img class="album-img"
+             src="오래된 사진첩 — 그때는 몰랐던 사랑.jpeg"
+             alt="">
+      </div>
+    </div>
+
+    <div class="lyrics-side">
+      <div class="lyrics-stack" id="stack"></div>
+    </div>
+  </div>
+</div>
+
+<div class="hint">tap to play</div>
+
+<audio id="aud"
+       src="오래된 사진첩 — 그때는 몰랐던 사랑.mp3"
+       preload="auto"></audio>
+
+<script>
+// ── Lyrics data (section tags stripped, timestamps in seconds) ──────────
+const L = [
+  [1.59,   "낡은 서랍 깊은 곳에서"],
+  [2.95,   "낡은 서랍 깊은 곳에서"],
+  [8.37,   "먼지 쌓인 기억을 꺼냈죠"],
+  [15.16,  "조심스레 펼친 사진첩엔"],
+  [21.94,  "잊고 살던 시간이 잠들어"],
+  [28.88,  "빛바랜 사진 한 장 속에"],
+  [35.42,  "어린 내가 웃고 있었죠"],
+  [39.57,  "작은 손을 꼭 잡아주던"],
+  [48.51,  "그대의 젊은 얼굴도 보여요"],
+  [55.69,  "그때 나는 알지 못했죠"],
+  [58.88,  "그 웃음 뒤에 숨은 마음을"],
+  [62.39,  "매일 나를 위해 접어두던"],
+  [66.22,  "그대의 하루와 꿈들을"],
+  [70.05,  "한 장 한 장 넘길 때마다"],
+  [79.38,  "가슴 깊이 번지는 말"],
+  [86.17,  "너무 늦게 알아버린"],
+  [92.63,  "그 사랑이 눈물이 되어"],
+  [99.25,  "그때는 몰랐던 사랑"],
+  [102.20, "너무 가까워 보이지 않던 마음"],
+  [110.02, "사진 속 그대는 아직도 젊은데"],
+  [116.56, "나는 이제야 그 마음을 알아요"],
+  [122.87, "그때는 몰랐던 사랑"],
+  [126.62, "당연한 줄 알았던 따뜻한 손길"],
+  [131.09, "세월이 지나고 나서야"],
+  [140.18, "고맙다는 말이 내 안에 피어요"],
+  [147.36, "낡은 마루, 저녁 밥 냄새"],
+  [153.66, "문밖에서 부르던 목소리"],
+  [157.89, "작은 방에 켜진 불빛 하나"],
+  [167.23, "그게 나의 세상이었죠"],
+  [174.25, "괜찮다며 웃어주시던"],
+  [177.20, "그 말 뒤에 감춘 눈물들"],
+  [181.19, "내가 잠든 밤에도 홀로"],
+  [184.30, "내일을 걱정하던 마음"],
+  [187.58, "한 장 한 장 넘길 때마다"],
+  [191.09, "잊은 줄 알았던 계절"],
+  [194.76, "돌아갈 수 없는 날들이"],
+  [198.11, "따뜻하게 나를 안아요"],
+  [204.01, "그때는 몰랐던 사랑"],
+  [208.24, "너무 가까워 보이지 않던 마음"],
+  [214.70, "사진 속 그대는 아직도 젊은데"],
+  [218.85, "나는 이제야 그 마음을 알아요"],
+  [227.71, "그때는 몰랐던 사랑"],
+  [231.46, "당연한 줄 알았던 따뜻한 손길"],
+  [238.40, "세월이 지나고 나서야"],
+  [244.94, "고맙다는 말이 내 안에 피어요"],
+  [249.09, "혹시 그날로 돌아간다면"],
+  [255.39, "나는 꼭 말하고 싶어요"],
+  [259.38, "당신의 작은 희생들이"],
+  [264.89, "내 삶을 지켜준 빛이었다고"],
+  [271.43, "말없이 내 곁을 지켜준 사람"],
+  [278.77, "언제나 나보다 나를 믿던 사람"],
+  [285.55, "늦었지만 이제야 불러봅니다"],
+  [292.33, "고마워요, 사랑했어요"],
+  [298.64, "그때는 몰랐던 사랑"],
+  [302.47, "시간이 지나 더 선명해진 마음"],
+  [309.41, "사진 속 그대는 아직도 웃는데"],
+  [316.03, "나는 조용히 눈물을 닦아요"],
+  [322.33, "그때는 몰랐던 사랑"],
+  [325.77, "내 삶 곳곳에 남겨진 따뜻한 흔적"],
+  [333.11, "한 장의 사진을 품에 안고"],
+  [339.65, "이제야 그 사랑을 불러봅니다"],
+  [346.83, "오래된 사진첩을 덮으면"],
+  [350.26, "방 안에 조용히 남는 말"],
+  [354.09, "그때는 몰랐던 사랑"],
+  [360.87, "이제는 내가 기억할게요"],
+];
+
+// ── Atmospheric background ───────────────────────────────────────────
+const canvas = document.getElementById('bg');
+const ctx    = canvas.getContext('2d');
+
+function resize() {
+  canvas.width  = innerWidth;
+  canvas.height = innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// Floating dust particles
+const DUST = Array.from({length: 60}, () => ({
+  x:  Math.random() * innerWidth,
+  y:  Math.random() * innerHeight,
+  r:  Math.random() * 1.1 + 0.2,
+  vx: (Math.random() - 0.5) * 0.09,
+  vy: -(Math.random() * 0.14 + 0.035),
+  a:  Math.random() * 0.30 + 0.05,
+}));
+
+// Slow drifting light streaks
+const STREAKS = Array.from({length: 4}, () => ({
+  x: Math.random() * innerWidth,
+  y: Math.random() * innerHeight,
+  w: Math.random() * 200 + 80,
+  h: Math.random() * 1.2 + 0.4,
+  a: Math.random() * 0.03 + 0.008,
+  vx: (Math.random() - 0.5) * 0.04,
+}));
+
+function drawBg() {
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // Deep warm-dark base
+  const g1 = ctx.createLinearGradient(0, 0, W, H);
+  g1.addColorStop(0,    '#0c0a16');
+  g1.addColorStop(0.38, '#100d1b');
+  g1.addColorStop(0.62, '#18120a');
+  g1.addColorStop(1,    '#0e0b16');
+  ctx.fillStyle = g1;
+  ctx.fillRect(0, 0, W, H);
+
+  // Warm amber glow — album area (left)
+  const ga = ctx.createRadialGradient(W*0.21, H*0.5, 0, W*0.21, H*0.5, W*0.34);
+  ga.addColorStop(0,   'rgba(168,118,52,0.10)');
+  ga.addColorStop(0.5, 'rgba(130,85,35,0.04)');
+  ga.addColorStop(1,   'transparent');
+  ctx.fillStyle = ga;
+  ctx.fillRect(0, 0, W, H);
+
+  // Soft cool glow — lyric area (right)
+  const gr = ctx.createRadialGradient(W*0.72, H*0.46, 0, W*0.72, H*0.46, W*0.30);
+  gr.addColorStop(0,   'rgba(100,85,135,0.04)');
+  gr.addColorStop(1,   'transparent');
+  ctx.fillStyle = gr;
+  ctx.fillRect(0, 0, W, H);
+
+  // Radial vignette
+  const gv = ctx.createRadialGradient(W/2, H/2, H*0.22, W/2, H/2, H*0.84);
+  gv.addColorStop(0, 'transparent');
+  gv.addColorStop(1, 'rgba(0,0,0,0.56)');
+  ctx.fillStyle = gv;
+  ctx.fillRect(0, 0, W, H);
+
+  // Top shadow
+  const gt = ctx.createLinearGradient(0, 0, 0, H*0.22);
+  gt.addColorStop(0, 'rgba(0,0,0,0.32)');
+  gt.addColorStop(1, 'transparent');
+  ctx.fillStyle = gt;
+  ctx.fillRect(0, 0, W, H);
+
+  // Light streaks (very subtle horizontal wisps)
+  STREAKS.forEach(s => {
+    const sg = ctx.createLinearGradient(s.x - s.w/2, 0, s.x + s.w/2, 0);
+    sg.addColorStop(0,   'transparent');
+    sg.addColorStop(0.5, `rgba(210,185,130,${s.a})`);
+    sg.addColorStop(1,   'transparent');
+    ctx.fillStyle = sg;
+    ctx.fillRect(s.x - s.w/2, s.y - s.h/2, s.w, s.h);
+    s.x += s.vx;
+    if (s.x > W + s.w) s.x = -s.w;
+    if (s.x < -s.w)    s.x =  W + s.w;
+  });
+
+  // Dust particles
+  DUST.forEach(p => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(215,188,132,${p.a})`;
+    ctx.fill();
+    p.x += p.vx;
+    p.y += p.vy;
+    if (p.y < -4) { p.y = H + 4; p.x = Math.random() * W; }
+    if (p.x < -4)  p.x = W + 4;
+    if (p.x > W+4) p.x = -4;
+  });
+
+  requestAnimationFrame(drawBg);
+}
+drawBg();
+
+// ── Lyrics engine ─────────────────────────────────────────────────────
+const aud   = document.getElementById('aud');
+const stack = document.getElementById('stack');
+const WIN   = 3;
+let   curIdx = -2; // force first render
+
+function getActiveIndex(t) {
+  let i = -1;
+  for (let j = 0; j < L.length; j++) {
+    if (t >= L[j][0]) i = j;
+    else break;
+  }
+  return i;
+}
+
+function render(ai) {
+  stack.innerHTML = '';
+  for (let off = -WIN; off <= WIN; off++) {
+    const li = ai + off;
+    const el = document.createElement('div');
+    if (li < 0 || li >= L.length) {
+      el.className = 'lline-empty';
+    } else {
+      el.className = 'lline';
+      el.dataset.pos = String(off);
+      el.textContent = L[li][1];
+    }
+    stack.appendChild(el);
+  }
+}
+
+render(0);
+
+aud.addEventListener('timeupdate', () => {
+  const i = getActiveIndex(aud.currentTime);
+  if (i !== curIdx) {
+    curIdx = i;
+    render(Math.max(0, i));
+  }
+});
+
+// Tap anywhere — play / pause
+document.body.addEventListener('click', () => {
+  aud.paused ? aud.play().catch(() => {}) : aud.pause();
+});
+</script>
+</body>
+</html>
