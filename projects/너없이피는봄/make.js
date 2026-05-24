@@ -10,7 +10,7 @@ const { lyrics, title } = parseSRT(srtContent);
 
 const songs = [{
   albumPath: path.join(DIR, '너 없이 피는 봄.jpeg'),
-  audioPath: path.join(DIR, '너 없이 피는 봄.mp3'),
+  audioPath: path.join(DIR, '너 없이 피는 봄.mp3'),
   lyrics,
   title: '너 없이 피는 봄',
 }];
@@ -67,12 +67,7 @@ const backgrounds = [
   // 10. Outro
   { imagePath: path.join(DIR, '02_intro_window.jpeg'),      startSec: 384 }, // 창가에 햇살이 내려와 오늘도 봄은 피어나고
   { imagePath: path.join(DIR, '03_verse_window.jpeg'),      startSec: 400 }, // 꽃잎은 아무 일 없다는 듯
-  { imagePath: path.join(DIR, '04_verse_walk.jpeg'),        startSec: 415 }, // 네가 좋아하던 길 위에
-  { imagePath: path.join(DIR, '05_verse_hand.jpeg'),        startSec: 432 }, // 손끝에 닿던 너의 온기
-  { imagePath: path.join(DIR, '06_verse_lonely.jpeg'),      startSec: 440 }, // 이제는 혼자 걷는 이 길
-  { imagePath: path.join(DIR, '07_verse_cafe.jpeg'),        startSec: 445 }, // 커피는 조금 식어가고
-  { imagePath: path.join(DIR, '08_pre_wind.jpeg'),          startSec: 461 }, // 바람이 불면 네 이름이 들리는 것 같아
-  { imagePath: path.join(DIR, '20_ending_road.jpeg'),       startSec: 471 }, // 벚꽃이 하얗게 피었어 (엔딩)
+  { imagePath: path.join(DIR, '20_ending_road.jpeg'),       startSec: 411 }, // 나는 아직 그날에 있어 + 엔딩
 ];
 
 const outputPath = path.join(DIR, '너_없이_피는_봄_완성본.mp4');
